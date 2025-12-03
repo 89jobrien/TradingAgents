@@ -451,6 +451,15 @@ SUFFIX_PATTERNS = [
 
 
 def _normalize_company_name(name: str) -> str:
+    """
+    Normalize a company name by lowercasing, trimming, and removing common corporate suffixes.
+    
+    Parameters:
+        name (str): Company name to normalize.
+    
+    Returns:
+        str: The normalized company name with common corporate suffixes removed and surrounding whitespace stripped.
+    """
     normalized = name.lower().strip()
     for pattern in SUFFIX_PATTERNS:
         normalized = re.sub(pattern, "", normalized, flags=re.IGNORECASE)
@@ -459,6 +468,15 @@ def _normalize_company_name(name: str) -> str:
 
 
 def _search_yfinance_ticker(company_name: str) -> Optional[str]:
+    """
+    Attempt to resolve a stock ticker symbol for a company name using yfinance.
+    
+    Parameters:
+        company_name (str): Company name or query to search for a ticker symbol.
+    
+    Returns:
+        Optional[str]: The resolved ticker symbol (e.g., "AAPL") if found, otherwise `None`.
+    """
     try:
         search_result = yf.Ticker(company_name)
         info = search_result.info
@@ -480,6 +498,12 @@ def _search_yfinance_ticker(company_name: str) -> Optional[str]:
 
 
 def validate_us_ticker(ticker: str) -> bool:
+    """
+    Check if a stock ticker is listed on a recognized US exchange.
+    
+    Returns:
+        `true` if the ticker is listed on a recognized US exchange, `false` otherwise.
+    """
     try:
         ticker_obj = yf.Ticker(ticker.upper())
         info = ticker_obj.info
@@ -503,6 +527,15 @@ def validate_us_ticker(ticker: str) -> bool:
 
 
 def resolve_ticker(company_name: str) -> Optional[str]:
+    """
+    Resolve a company name, common alias, or ticker symbol to a validated US stock ticker.
+    
+    Parameters:
+        company_name (str): Company name, alias, or ticker symbol to resolve. Matching is case-insensitive; common corporate suffixes (e.g., "inc", "corp", "llc") are removed during normalization.
+    
+    Returns:
+        Optional[str]: Uppercase ticker symbol if a matching ticker is found and confirmed to be listed on a US exchange, `None` if resolution or validation fails or input is empty.
+    """
     if not company_name or not company_name.strip():
         return None
 
@@ -535,4 +568,13 @@ def resolve_ticker(company_name: str) -> Optional[str]:
 
 
 def validate_tradeable(ticker: str) -> bool:
+    """
+    Determine whether a stock ticker is tradeable on a US exchange.
+    
+    Parameters:
+    	ticker (str): Stock ticker symbol (e.g., "AAPL", "GOOGL").
+    
+    Returns:
+    	`true` if the ticker corresponds to a US exchange, `false` otherwise.
+    """
     return validate_us_ticker(ticker)

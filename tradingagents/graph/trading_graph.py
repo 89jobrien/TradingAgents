@@ -60,6 +60,16 @@ class DiscoveryTimeoutException(Exception):
 
 
 def _timeout_handler(signum, frame):
+    """
+    Signal handler that raises a DiscoveryTimeoutException to indicate the discovery operation exceeded its allowed time.
+    
+    Parameters:
+        signum: The signal number received.
+        frame: The current stack frame (or None) at the time the signal was received.
+    
+    Raises:
+        DiscoveryTimeoutException: Always raised to abort a timed-out discovery operation.
+    """
     raise DiscoveryTimeoutException("Discovery operation timed out")
 
 
@@ -71,6 +81,19 @@ class TradingAgentsGraph:
         debug=False,
         config: Dict[str, Any] = None,
     ):
+        """
+        Initialize a TradingAgentsGraph instance with LLMs, memories, tools, and graph components wired together.
+        
+        Constructs and configures LLM clients based on `config["llm_provider"]`, creates financial situation memories, builds tool nodes, sets up conditional logic and the agent graph, and prepares supporting components for propagation, reflection, and signal processing.
+        
+        Parameters:
+            selected_analysts (list[str]): List of analyst categories to include in the graph (defaults to ["market", "social", "news", "fundamentals"]).
+            debug (bool): If True, enables debug behaviour for graph execution and streaming (default False).
+            config (dict | None): Configuration dictionary overriding defaults; used for project paths, LLM provider and model names, backend URLs, and other runtime options. If None, DEFAULT_CONFIG is used.
+        
+        Raises:
+            ValueError: If `config["llm_provider"]` is not one of the supported providers ("openai", "ollama", "openrouter", "anthropic", "google").
+        """
         self.debug = debug
         self.config = config or DEFAULT_CONFIG
 
@@ -121,6 +144,16 @@ class TradingAgentsGraph:
         self.graph = self.graph_setup.setup_graph(selected_analysts)
 
     def _create_tool_nodes(self) -> Dict[str, ToolNode]:
+        """
+        Builds and returns the set of categorized ToolNode objects used by the agent graph.
+        
+        Returns:
+            tool_nodes (Dict[str, ToolNode]): Mapping of category names to ToolNode instances:
+                - "market": tools for fetching stock data and indicators.
+                - "social": tools for retrieving social/news mentions.
+                - "news": tools for news, global news, insider sentiment, and insider transactions.
+                - "fundamentals": tools for financial fundamentals and statements.
+        """
         return {
             "market": ToolNode(
                 [
@@ -152,6 +185,16 @@ class TradingAgentsGraph:
         }
 
     def propagate(self, company_name, trade_date):
+        """
+        Run the agent graph for a company on a given trade date and return the final state and processed trading signal.
+        
+        Parameters:
+            company_name (str): Company ticker or identifier to analyze.
+            trade_date (date): Date for which the agents should generate the trading analysis.
+        
+        Returns:
+            tuple: A pair (final_state, processed_signal) where `final_state` is the agent graph's resulting state dictionary and `processed_signal` is the signal returned by processing `final_state["final_trade_decision"]`.
+        """
         self.ticker = company_name
         init_agent_state = self.propagator.create_initial_state(
             company_name, trade_date
@@ -177,6 +220,21 @@ class TradingAgentsGraph:
         return final_state, self.process_signal(final_state["final_trade_decision"])
 
     def _log_state(self, trade_date, final_state):
+        """
+        Record and persist the agent's final state for a given trade date.
+        
+        Stores a structured subset of `final_state` under `self.log_states_dict[str(trade_date)]`
+        and writes the entire `log_states_dict` to
+        eval_results/{self.ticker}/TradingAgentsStrategy_logs/full_states_log_{trade_date}.json,
+        creating the directory if necessary.
+        
+        Parameters:
+        	trade_date (date | str): The trade date used as the log key and filename suffix.
+        	final_state (dict): The final agent state object containing keys such as
+        		company_of_interest, market_report, sentiment_report, news_report,
+        		fundamentals_report, investment_debate_state, trader_investment_plan,
+        		risk_debate_state, investment_plan, and final_trade_decision.
+        """
         self.log_states_dict[str(trade_date)] = {
             "company_of_interest": final_state["company_of_interest"],
             "trade_date": final_state["trade_date"],
@@ -217,6 +275,12 @@ class TradingAgentsGraph:
             json.dump(self.log_states_dict, f, indent=4)
 
     def reflect_and_remember(self, returns_losses):
+        """
+        Update internal agent memories by reflecting on the provided returns/losses.
+        
+        Parameters:
+            returns_losses: A value or structure representing recent returns and losses (e.g., profit/loss metrics) used to update each role-specific memory (bull researcher, bear researcher, trader, investment judge, and risk manager).
+        """
         self.reflector.reflect_bull_researcher(
             self.curr_state, returns_losses, self.bull_memory
         )
@@ -234,12 +298,36 @@ class TradingAgentsGraph:
         )
 
     def process_signal(self, full_signal):
+        """
+        Convert a raw final trade-decision signal into a normalized actionable signal.
+        
+        Parameters:
+        	full_signal (Any): The raw full decision produced by the agents (typically a dict or object containing decision details, rationale, and metadata).
+        
+        Returns:
+        	Any: A normalized signal suitable for execution or downstream processing (for example an action string or structured signal object).
+        """
         return self.signal_processor.process_signal(full_signal)
 
     def discover_trending(
         self,
         request: Optional[DiscoveryRequest] = None,
     ) -> DiscoveryResult:
+        """
+        Discover trending stocks from recent news within a configurable lookback period.
+        
+        Parameters:
+            request (Optional[DiscoveryRequest]): Discovery parameters (lookback_period, max_results, sector_filter, event_filter).
+                If omitted, a default request is created with a 24h lookback and `discovery_max_results` from config (default 20).
+        
+        Returns:
+            DiscoveryResult: Result object containing the original request, the list of discovered trending stocks (possibly filtered
+            by sector or event), discovery status (PROCESSING/COMPLETED/FAILED), start and completion timestamps, and an error_message
+            when applicable.
+        
+        Raises:
+            DiscoveryTimeoutError: If the discovery operation exceeds the configured hard timeout (`discovery_hard_timeout` in config).
+        """
         if request is None:
             request = DiscoveryRequest(
                 lookback_period="24h",
@@ -259,6 +347,11 @@ class TradingAgentsGraph:
         discovery_result = {"stocks": [], "error": None}
 
         def run_discovery():
+            """
+            Populate the outer discovery_result dictionary with trending stocks computed from recent news articles or record an error.
+            
+            Fetches articles for request.lookback_period, extracts entity mentions using self.config, computes trending scores constrained by the `discovery_min_mentions` and `discovery_max_results` configuration (overridden by `request.max_results` when provided), and assigns the resulting list to `discovery_result["stocks"]`. On exception, stores the exception string in `discovery_result["error"]`.
+            """
             try:
                 articles = get_bulk_news(request.lookback_period)
 
@@ -320,6 +413,16 @@ class TradingAgentsGraph:
         trending_stock: TrendingStock,
         trade_date: Optional[date] = None,
     ) -> Tuple[Dict[str, Any], str]:
+        """
+        Analyze a single trending stock by running the trading agents graph for a given trade date.
+        
+        Parameters:
+            trending_stock (TrendingStock): TrendingStock object whose `ticker` will be analyzed.
+            trade_date (date, optional): Date for which to run the analysis; defaults to today's date.
+        
+        Returns:
+            Tuple[Dict[str, Any], str]: A tuple with the final agent state dictionary and the processed trade signal string.
+        """
         ticker = trending_stock.ticker
 
         if trade_date is None:

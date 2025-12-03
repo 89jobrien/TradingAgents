@@ -198,6 +198,12 @@ class TestTimeoutHandlingWithPartialResults:
     @patch("tradingagents.graph.trading_graph.get_bulk_news")
     def test_timeout_handling_returns_error(self, mock_bulk_news):
         def slow_fetch(*args, **kwargs):
+            """
+            Simulate a slow fetch operation by sleeping for 0.3 seconds.
+            
+            Returns:
+                list: An empty list representing no fetched items.
+            """
             import time
             time.sleep(0.3)
             return []

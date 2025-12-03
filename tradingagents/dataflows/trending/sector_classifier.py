@@ -203,6 +203,15 @@ _sector_cache: Dict[str, str] = {}
 
 
 def _llm_classify_sector(ticker: str) -> str:
+    """
+    Classify a stock ticker into one of the predefined sectors using the configured LLM.
+    
+    Parameters:
+        ticker (str): The stock ticker symbol to classify.
+    
+    Returns:
+        str: The sector name in lowercase (one of VALID_SECTORS). Returns "other" if the LLM's response is not a valid sector.
+    """
     from langchain_openai import ChatOpenAI
     from langchain_core.messages import HumanMessage, SystemMessage
     from tradingagents.default_config import DEFAULT_CONFIG
@@ -246,6 +255,15 @@ def _llm_classify_sector(ticker: str) -> str:
 
 
 def classify_sector(ticker: str) -> str:
+    """
+    Determine the sector for a stock ticker using a predefined mapping with an LLM fallback.
+    
+    Parameters:
+        ticker (str): Stock ticker symbol (case-insensitive).
+    
+    Returns:
+        str: The sector name (lowercase) for the given ticker, or "other" if the sector is unknown or classification fails.
+    """
     ticker_upper = ticker.upper()
 
     if ticker_upper in TICKER_TO_SECTOR:

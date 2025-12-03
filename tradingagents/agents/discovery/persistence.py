@@ -10,6 +10,16 @@ def save_discovery_result(
     result: DiscoveryResult,
     base_path: Optional[Path] = None,
 ) -> Path:
+    """
+    Persist a DiscoveryResult to disk and write a Markdown summary.
+    
+    Parameters:
+        result (DiscoveryResult): Discovery result to persist; its `to_dict()` output is written as JSON and used to generate the summary.
+        base_path (Optional[Path]): Base directory under which a path of the form `discovery/YYYY-MM-DD/HH-MM-SS` will be created. Defaults to `results` when omitted.
+    
+    Returns:
+        Path: Path to the directory created for this result (contains `discovery_result.json` and `discovery_summary.md`).
+    """
     if base_path is None:
         base_path = Path("results")
 
@@ -33,6 +43,15 @@ def save_discovery_result(
 
 
 def generate_markdown_summary(result: DiscoveryResult) -> str:
+    """
+    Builds a Markdown-formatted summary report for a DiscoveryResult.
+    
+    Parameters:
+        result (DiscoveryResult): Discovery result containing request metadata and a list of TrendingStock items to summarize.
+    
+    Returns:
+        markdown (str): Complete Markdown document as a single string, including a header with timestamp, lookback period, active filters, a table of all trending stocks, and detailed analysis sections for the top three stocks.
+    """
     lines = []
 
     lines.append("# Discovery Results")
@@ -71,6 +90,15 @@ def generate_markdown_summary(result: DiscoveryResult) -> str:
 
 
 def _format_filters(result: DiscoveryResult) -> str:
+    """
+    Build a concise textual representation of the active sector and event filters from a DiscoveryResult.
+    
+    Parameters:
+        result (DiscoveryResult): Discovery result whose request contains optional `sector_filter` and `event_filter`.
+    
+    Returns:
+        filters (str): A space-separated string like "sector=SectorA,SectorB event=EventX,EventY" when filters exist, or "None" when no filters are present.
+    """
     filter_parts = []
 
     if result.request.sector_filter:
@@ -87,6 +115,16 @@ def _format_filters(result: DiscoveryResult) -> str:
 
 
 def _format_stock_detail(rank: int, stock: TrendingStock) -> list:
+    """
+    Builds a Markdown-formatted detail block for a single trending stock.
+    
+    Parameters:
+    	rank (int): The stock's rank in the trending list.
+    	stock (TrendingStock): The trending stock object containing ticker, company name, score, sentiment, sector, event type, mention count, news summary, and source articles.
+    
+    Returns:
+    	lines (list): A list of strings representing Markdown lines for the stock's detailed section (header, metrics, news summary, and up to three top source entries).
+    """
     lines = []
 
     lines.append(f"### {rank}. {stock.ticker} - {stock.company_name}")
@@ -113,6 +151,15 @@ def _format_stock_detail(rank: int, stock: TrendingStock) -> list:
 
 
 def _get_sentiment_label(sentiment: float) -> str:
+    """
+    Map a numeric sentiment score to a qualitative label.
+    
+    Parameters:
+        sentiment (float): Numeric sentiment score where positive values indicate positive sentiment and negative values indicate negative sentiment.
+    
+    Returns:
+        str: "positive" if `sentiment` > 0.3, "negative" if `sentiment` < -0.3, "neutral" otherwise.
+    """
     if sentiment > 0.3:
         return "positive"
     elif sentiment < -0.3:

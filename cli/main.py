@@ -48,6 +48,12 @@ app = typer.Typer(
 
 class MessageBuffer:
     def __init__(self, max_length=100):
+        """
+        Initialize the message and report buffer used to collect streaming messages, tool calls, agent statuses, and per-section reports.
+        
+        Parameters:
+            max_length (int): Maximum number of recent messages and tool calls to retain in the buffer.
+        """
         self.messages = deque(maxlen=max_length)
         self.tool_calls = deque(maxlen=max_length)
         self.current_report = None
@@ -91,11 +97,23 @@ class MessageBuffer:
             self.current_agent = agent
 
     def update_report_section(self, section_name, content):
+        """
+        Store content for a named report section and refresh the current and final reports.
+        
+        Parameters:
+            section_name (str): Key identifying a report section; must be one of the keys in self.report_sections (e.g., 'market_report', 'sentiment_report', 'news_report', 'fundamentals_report', 'investment_plan', 'trader_investment_plan', 'final_trade_decision').
+            content (str | None): The textual content to save for the section; may be None to clear the section.
+        """
         if section_name in self.report_sections:
             self.report_sections[section_name] = content
             self._update_current_report()
 
     def _update_current_report(self):
+        """
+        Update the MessageBuffer's current_report to reflect the most recently populated report section and refresh the aggregated final_report.
+        
+        Finds the last non-None entry in self.report_sections, maps that section key to a human-readable heading, and sets self.current_report to a markdown-formatted heading plus the section content. Also invokes self._update_final_report() to recompute the consolidated final report.
+        """
         latest_section = None
         latest_content = None
 
@@ -121,6 +139,17 @@ class MessageBuffer:
         self._update_final_report()
 
     def _update_final_report(self):
+        """
+        Builds the aggregated final report from available report sections and assigns it to self.final_report.
+        
+        The method composes the final report by appending present sections in a fixed order with headings:
+        - Analyst Team Reports (includes market, sentiment, news, and fundamentals subsections when present)
+        - Research Team Decision (investment_plan)
+        - Trading Team Plan (trader_investment_plan)
+        - Portfolio Management Decision (final_trade_decision)
+        
+        If no report sections are available, self.final_report is set to None.
+        """
         report_parts = []
 
         if any(
@@ -196,6 +225,17 @@ EVENT_OPTIONS = [
 
 
 def create_question_box(title: str, prompt: str, default: str = None) -> Panel:
+    """
+    Create a styled Rich Panel used as a prompt/question box.
+    
+    Parameters:
+        title (str): Header text displayed in bold at the top of the panel.
+        prompt (str): Instructional or descriptive text shown under the title.
+        default (str, optional): Optional default value shown in dim text beneath the prompt.
+    
+    Returns:
+        Panel: A Rich Panel containing the formatted title, prompt, and optional default, styled with a blue border and padding.
+    """
     box_content = f"[bold]{title}[/bold]\n"
     box_content += f"[dim]{prompt}[/dim]"
     if default:
@@ -204,6 +244,14 @@ def create_question_box(title: str, prompt: str, default: str = None) -> Panel:
 
 
 def select_lookback_period() -> str:
+    """
+    Prompt the user to choose a lookback period for discovery.
+    
+    Prompts with interactive choices defined by LOOKBACK_OPTIONS. If the user cancels or makes no selection, the process exits with status code 1.
+    
+    Returns:
+        str: The selected lookback period value.
+    """
     choice = questionary.select(
         "Select lookback period:",
         choices=[
@@ -227,6 +275,12 @@ def select_lookback_period() -> str:
 
 
 def select_sector_filter() -> Optional[List[Sector]]:
+    """
+    Prompt the user to optionally choose one or more sectors to filter discovery results.
+    
+    Returns:
+        A list of selected `Sector` values when the user enables filtering and selects at least one sector, or `None` if the user declines to filter or makes no selection.
+    """
     use_filter = questionary.confirm(
         "Filter by sector?",
         default=False,
@@ -264,6 +318,12 @@ def select_sector_filter() -> Optional[List[Sector]]:
 
 
 def select_event_filter() -> Optional[List[EventCategory]]:
+    """
+    Prompt the user to optionally choose one or more event categories to filter discovery results.
+    
+    Returns:
+        Optional[List[EventCategory]]: A list of selected `EventCategory` values when the user enables filtering and picks at least one option, or `None` if the user declines to filter or selects no choices.
+    """
     use_filter = questionary.confirm(
         "Filter by event type?",
         default=False,
@@ -301,6 +361,18 @@ def select_event_filter() -> Optional[List[EventCategory]]:
 
 
 def create_discovery_results_table(trending_stocks: List[TrendingStock]) -> Table:
+    """
+    Builds a Rich Table listing trending stocks and their key metrics.
+    
+    Parameters:
+        trending_stocks (List[TrendingStock]): Ordered list of trending stock records. Each record is expected to provide
+            `ticker`, `company_name`, `score`, `mention_count`, and `event_type`.
+    
+    Returns:
+        Table: A Rich Table populated with rows for each trending stock and the columns
+        "Rank", "Ticker", "Company", "Score", "Mentions", and "Event Type". The top three ranks and their tickers
+        are styled for emphasis; company names are truncated to fit the table width.
+    """
     table = Table(
         show_header=True,
         header_style="bold magenta",
@@ -338,6 +410,20 @@ def create_discovery_results_table(trending_stocks: List[TrendingStock]) -> Tabl
 
 
 def create_stock_detail_panel(stock: TrendingStock, rank: int) -> Panel:
+    """
+    Create a Rich Panel showing detailed information for a trending stock.
+    
+    Parameters:
+        stock (TrendingStock): The trending stock to display; expected to provide
+            ticker, company_name, score, sentiment, sector, event_type,
+            mention_count, news_summary, and source_articles.
+        rank (int): The stock's ranking position to display in the panel.
+    
+    Returns:
+        Panel: A Rich Panel containing a formatted summary of the stock (rank, ticker,
+        company, score, sentiment with color-coded label, sector, event type, mentions,
+        a news summary, and up to the top three source articles).
+    """
     sentiment_label = "positive" if stock.sentiment > 0.3 else "negative" if stock.sentiment < -0.3 else "neutral"
     sentiment_color = "green" if stock.sentiment > 0.3 else "red" if stock.sentiment < -0.3 else "yellow"
 
@@ -366,6 +452,15 @@ def create_stock_detail_panel(stock: TrendingStock, rank: int) -> Panel:
 
 
 def select_stock_for_detail(trending_stocks: List[TrendingStock]) -> Optional[TrendingStock]:
+    """
+    Present an interactive selection list of trending stocks and return the chosen stock.
+    
+    Parameters:
+        trending_stocks (List[TrendingStock]): Ordered list of trending stocks to present to the user.
+    
+    Returns:
+        Optional[TrendingStock]: The selected TrendingStock, or `None` if the user chooses to go back or if no stocks are provided.
+    """
     if not trending_stocks:
         return None
 
@@ -395,6 +490,11 @@ def select_stock_for_detail(trending_stocks: List[TrendingStock]) -> Optional[Tr
 
 
 def discover_trending_flow():
+    """
+    Run the interactive "Discover Trending Stocks" CLI flow.
+    
+    Prompts the user for lookback period, optional sector and event filters, LLM provider, and model; performs a discovery request to find trending stocks, persists results when available, and displays a results table and per-stock detail panels. The flow prints progress and errors to the console, gracefully exits on failures, and allows the user to optionally start a deeper analysis for a selected ticker.
+    """
     console.print(Rule("[bold green]Discover Trending Stocks[/bold green]"))
     console.print()
 
@@ -552,6 +652,25 @@ def discover_trending_flow():
 
 
 def run_analysis_for_ticker(ticker: str, config: dict):
+    """
+    Run an interactive, multi-agent analysis workflow for a single ticker and persist live reports and logs.
+    
+    This function launches an interactive CLI flow to select analyst agents, research depth, and deep-thinking model, then builds and executes a TradingAgentsGraph analysis for the given ticker. While the graph streams results it updates the global message buffer and a live terminal UI, writes per-section Markdown reports into a results directory, and appends structured messages and tool-call entries to a per-run log file.
+    
+    Parameters:
+        ticker (str): The stock ticker symbol to analyze.
+        config (dict): Configuration options that control the analysis and persistence. Recognized keys:
+            - "results_dir" (str | Path): Base directory where run results, reports, and logs are written.
+            - "llm_provider" (str): Name of the LLM provider used to select deep-thinking agents.
+            - "max_debate_rounds" (int): (set by this function from selected research depth) maximum rounds for debate-style analysis.
+            - "max_risk_discuss_rounds" (int): (set by this function from selected research depth) maximum rounds for risk discussion.
+            - "deep_think_llm" (str): (set by this function) identifier of the deep-thinking LLM selected for the run.
+    
+    Side effects:
+        - Interacts with the user via the terminal (selection prompts and live progress).
+        - Creates directories and files under `<results_dir>/<ticker>/<YYYY-MM-DD>/`, including per-section Markdown reports and a message_tool.log file.
+        - Updates the global `message_buffer` with streamed messages, tool calls, agent statuses, and report sections.
+    """
     analysis_date = datetime.datetime.now().strftime("%Y-%m-%d")
 
     console.print(
@@ -598,9 +717,24 @@ def run_analysis_for_ticker(ticker: str, config: dict):
     log_file.touch(exist_ok=True)
 
     def save_message_decorator(obj, func_name):
+        """
+        Create a wrapper for a method that appends the object's most recent message to the log file after the method runs.
+        
+        Parameters:
+            obj: The object containing a `messages` deque where the last entry is a (timestamp, message_type, content) tuple.
+            func_name (str): The name of the method on `obj` to wrap.
+        
+        Returns:
+            function: A wrapper function that calls the original method and then writes the latest message (with newlines replaced by spaces) to the module-level `log_file`.
+        """
         func = getattr(obj, func_name)
         @wraps(func)
         def wrapper(*args, **kwargs):
+            """
+            Call the wrapped function and append the most recent message from obj.messages to the log file.
+            
+            Calls the original function with the provided arguments, then reads the last (timestamp, message_type, content) tuple from obj.messages, replaces newlines in the content with spaces, and writes a single-line entry "<timestamp> [<message_type>] <content>" to the configured log file.
+            """
             func(*args, **kwargs)
             timestamp, message_type, content = obj.messages[-1]
             content = content.replace("\n", " ")
@@ -609,9 +743,27 @@ def run_analysis_for_ticker(ticker: str, config: dict):
         return wrapper
 
     def save_tool_call_decorator(obj, func_name):
+        """
+        Create a wrapper for a method on `obj` that, after invoking the original method, appends the object's most recent tool-call entry to the shared log file.
+        
+        Parameters:
+            obj: An object that exposes a `tool_calls` sequence where each entry is a tuple (timestamp, tool_name, args_dict).
+            func_name (str): The name of the attribute on `obj` to wrap; that attribute must be callable.
+        
+        Returns:
+            wrapper (callable): A function that calls the original method and then writes a single line to `log_file` containing the timestamp, the tool name, and the keyword-argument pairs from the recorded tool call.
+        """
         func = getattr(obj, func_name)
         @wraps(func)
         def wrapper(*args, **kwargs):
+            """
+            Call the wrapped function with the supplied arguments and append the most recent tool call recorded on `obj.tool_calls` to `log_file`.
+            
+            This writes a single line to `log_file` with the format:
+            `<timestamp> [Tool Call] <tool_name>(key1=value1, key2=value2, ...)`.
+            
+            Note: forwards all positional and keyword arguments to the wrapped function and relies on `obj.tool_calls` containing at least one entry.
+            """
             func(*args, **kwargs)
             timestamp, tool_name, args = obj.tool_calls[-1]
             args_str = ", ".join(f"{k}={v}" for k, v in args.items())
@@ -620,9 +772,31 @@ def run_analysis_for_ticker(ticker: str, config: dict):
         return wrapper
 
     def save_report_section_decorator(obj, func_name):
+        """
+        Wraps an object's method to persist updated report sections to markdown files.
+        
+        Calls the original method named by `func_name` on `obj` with (section_name, content). After the call, if `obj.report_sections[section_name]` exists and is non-empty, writes that content to a file named "<section_name>.md" in the module's `report_dir`.
+        
+        Parameters:
+            obj: The target object that exposes a callable attribute named by `func_name` and a `report_sections` mapping.
+            func_name (str): The attribute name of the method on `obj` to wrap.
+        
+        Returns:
+            function: A wrapper function that accepts `section_name` and `content`, performs the original call, and persists the section to disk when present.
+        """
         func = getattr(obj, func_name)
         @wraps(func)
         def wrapper(section_name, content):
+            """
+            Persist a report section to disk when the section exists and has content.
+            
+            Parameters:
+            	section_name (str): Key identifying the report section (used as the output filename `<section_name>.md`).
+            	content (str | None): Section content provided by the caller; if updated content is available on `obj.report_sections`, that value is written instead.
+            
+            Notes:
+            	If the section exists in `obj.report_sections` and its value is not None or empty, the function writes the section content to `<report_dir>/<section_name>.md`.
+            """
             func(section_name, content)
             if section_name in obj.report_sections and obj.report_sections[section_name] is not None:
                 content = obj.report_sections[section_name]
@@ -710,6 +884,18 @@ def run_analysis_for_ticker(ticker: str, config: dict):
 
 
 def process_chunk_for_display(chunk, selected_analysts):
+    """
+    Process a streaming graph chunk and update the global message buffer and agent statuses for UI display.
+    
+    This inspects known keys in `chunk` (market_report, sentiment_report, news_report, fundamentals_report,
+    investment_debate_state, trader_investment_plan, risk_debate_state) and, when present, writes report sections,
+    appends reasoning messages, and advances or completes the corresponding agent statuses to reflect pipeline progress.
+    
+    Parameters:
+        chunk (dict): A streaming update containing zero or more report fragments and decision-state entries.
+        selected_analysts (Iterable[AnalystType]): The set of analyst types enabled for this run; used to advance the next agent when a stage completes.
+    
+    """
     if "market_report" in chunk and chunk["market_report"]:
         message_buffer.update_report_section("market_report", chunk["market_report"])
         message_buffer.update_agent_status("Market Analyst", "completed")
@@ -828,6 +1014,14 @@ def process_chunk_for_display(chunk, selected_analysts):
 
 
 def create_layout():
+    """
+    Constructs the Rich UI layout used across the CLI with predefined header, main, and footer regions.
+    
+    The layout contains a top header, a main area split into an upper panel (progress and messages) and an analysis panel, and a bottom footer. The upper panel is further split into a progress column and a messages column.
+    
+    Returns:
+        layout (rich.layout.Layout): A Layout with named regions: "header", "main", "footer", where "main" contains "upper" (with "progress" and "messages") and "analysis".
+    """
     layout = Layout()
     layout.split_column(
         Layout(name="header", size=3),
@@ -844,6 +1038,20 @@ def create_layout():
 
 
 def update_display(layout, spinner_text=None):
+    """
+    Update the given Rich layout panels to reflect the current CLI state, including header, per-team progress, recent messages/tool calls, the current analysis report, and footer statistics.
+    
+    Parameters:
+        layout (rich.layout.Layout): The layout to update; panels named "header", "progress", "messages", "analysis", and "footer" will be modified.
+        spinner_text (str | None): Optional text to append as a spinner row in the messages panel when provided.
+    
+    Behavior notes:
+        - Displays per-team agent statuses and shows a spinner for agents with status "in_progress".
+        - Shows the most recent 12 combined tool calls and messages (long tool args are truncated at 100 chars; message content is truncated at 200 chars).
+        - Sorts messages chronologically and renders wrapped content for display.
+        - When a current report is available, renders it in the analysis panel; otherwise displays a waiting placeholder.
+        - Footer presents counts for tool calls, LLM reasoning calls, and generated report sections.
+    """
     layout["header"].update(
         Panel(
             "[bold green]Welcome to TradingAgents CLI[/bold green]\n"
@@ -1022,6 +1230,20 @@ def update_display(layout, spinner_text=None):
 
 
 def get_user_selections():
+    """
+    Collect interactive CLI inputs for a trading analysis run and return the gathered selections.
+    
+    Returns:
+        selections (dict): Mapping of user choices:
+            - "ticker" (str): Uppercase ticker symbol to analyze.
+            - "analysis_date" (str): Analysis date in "YYYY-MM-DD" format.
+            - "analysts" (list): Selected analyst agent enum values.
+            - "research_depth" (str or enum): Chosen research depth level.
+            - "llm_provider" (str): Selected LLM provider name (lowercased).
+            - "backend_url" (str or None): Backend URL associated with the chosen provider.
+            - "shallow_thinker" (str or enum): Selected shallow-thinking agent for analysis.
+            - "deep_thinker" (str or enum): Selected deep-thinking agent for analysis.
+    """
     with open("./cli/static/welcome.txt", "r") as f:
         welcome_ascii = f.read()
 
@@ -1103,10 +1325,24 @@ def get_user_selections():
 
 
 def get_ticker():
+    """
+    Prompt the user to enter a stock ticker symbol, defaulting to "SPY".
+    
+    Returns:
+        ticker (str): The ticker symbol entered by the user (or "SPY" if left blank).
+    """
     return typer.prompt("", default="SPY")
 
 
 def get_analysis_date():
+    """
+    Prompt the user to select an analysis date (YYYY-MM-DD), defaulting to today.
+    
+    Prompts repeatedly until the input matches the YYYY-MM-DD format and is not a future date.
+    
+    Returns:
+        date_str (str): The chosen analysis date in 'YYYY-MM-DD' format.
+    """
     while True:
         date_str = typer.prompt(
             "", default=datetime.datetime.now().strftime("%Y-%m-%d")
@@ -1124,6 +1360,30 @@ def get_analysis_date():
 
 
 def display_complete_report(final_state):
+    """
+    Render a multi-section, human-readable analysis report to the application console from a final analysis state.
+    
+    Parameters:
+        final_state (dict): A mapping containing completed report sections and decisions. Known keys:
+            - "market_report" (str): Market analyst markdown content.
+            - "sentiment_report" (str): Social/sentiment analyst markdown content.
+            - "news_report" (str): News analyst markdown content.
+            - "fundamentals_report" (str): Fundamentals analyst markdown content.
+            - "investment_debate_state" (dict): Research-team debate with optional keys:
+                - "bull_history" (str): Bull researcher markdown content.
+                - "bear_history" (str): Bear researcher markdown content.
+                - "judge_decision" (str): Research manager decision markdown content.
+            - "trader_investment_plan" (str): Trader team plan markdown content.
+            - "risk_debate_state" (dict): Risk/portfolio debate with optional keys:
+                - "risky_history" (str): Aggressive analyst markdown content.
+                - "safe_history" (str): Conservative analyst markdown content.
+                - "neutral_history" (str): Neutral analyst markdown content.
+                - "judge_decision" (str): Portfolio manager decision markdown content.
+    
+    Behavior:
+        Prints formatted panels and columns to the global console for each present section in the order:
+        Analyst Team Reports, Research Team Decision, Trading Team Plan, Risk Management Team Decision, and Portfolio Manager Decision.
+    """
     console.print("\n[bold green]Complete Analysis Report[/bold green]\n")
 
     analyst_reports = []
@@ -1298,12 +1558,27 @@ def display_complete_report(final_state):
 
 
 def update_research_team_status(status):
+    """
+    Set the status for all members of the research team in the global message buffer.
+    
+    Parameters:
+        status (str): The status value to assign to each research team agent (e.g., "pending", "in_progress", "completed").
+    """
     research_team = ["Bull Researcher", "Bear Researcher", "Research Manager", "Trader"]
     for agent in research_team:
         message_buffer.update_agent_status(agent, status)
 
 
 def extract_content_string(content):
+    """
+    Convert various content forms into a single plain string suitable for display.
+    
+    Parameters:
+        content: The value to stringify. May be a string, a list of items (where items can be dicts or other values), or any other object.
+    
+    Returns:
+        A single string representing the input. If `content` is a string it is returned unchanged. If it is a list, elements are concatenated with spaces; dict items with `type == "text"` contribute their `text` value, dict items with `type == "tool_use"` are represented as `[Tool: <name>]`, and other elements are converted with `str()`. For other types, the result of `str(content)` is returned.
+    """
     if isinstance(content, str):
         return content
     elif isinstance(content, list):
@@ -1322,6 +1597,17 @@ def extract_content_string(content):
 
 
 def run_analysis():
+    """
+    Run the interactive analysis workflow for a single ticker.
+    
+    Starts an interactive prompt sequence to collect analysis options, constructs and runs a TradingAgentsGraph analysis, streams agent messages and report sections to the live CLI display, and persists logs and per-section Markdown reports to disk.
+    
+    Side effects:
+    - Prompts the user for selections (ticker, date, analysts, models, backend).
+    - Creates results and report directories and writes a per-run log file and section Markdown files.
+    - Updates the global message_buffer with messages, tool calls, agent statuses, and report sections.
+    - Renders a live Rich UI during streaming and displays the final consolidated report.
+    """
     selections = get_user_selections()
 
     config = DEFAULT_CONFIG.copy()
@@ -1344,9 +1630,24 @@ def run_analysis():
     log_file.touch(exist_ok=True)
 
     def save_message_decorator(obj, func_name):
+        """
+        Create a wrapper for a method that appends the object's most recent message to the log file after the method runs.
+        
+        Parameters:
+            obj: The object containing a `messages` deque where the last entry is a (timestamp, message_type, content) tuple.
+            func_name (str): The name of the method on `obj` to wrap.
+        
+        Returns:
+            function: A wrapper function that calls the original method and then writes the latest message (with newlines replaced by spaces) to the module-level `log_file`.
+        """
         func = getattr(obj, func_name)
         @wraps(func)
         def wrapper(*args, **kwargs):
+            """
+            Call the wrapped function and append the most recent message from obj.messages to the log file.
+            
+            Calls the original function with the provided arguments, then reads the last (timestamp, message_type, content) tuple from obj.messages, replaces newlines in the content with spaces, and writes a single-line entry "<timestamp> [<message_type>] <content>" to the configured log file.
+            """
             func(*args, **kwargs)
             timestamp, message_type, content = obj.messages[-1]
             content = content.replace("\n", " ")
@@ -1355,6 +1656,16 @@ def run_analysis():
         return wrapper
 
     def save_tool_call_decorator(obj, func_name):
+        """
+        Create a wrapper for a method on `obj` that, after invoking the original method, appends the object's most recent tool-call entry to the shared log file.
+        
+        Parameters:
+            obj: An object that exposes a `tool_calls` sequence where each entry is a tuple (timestamp, tool_name, args_dict).
+            func_name (str): The name of the attribute on `obj` to wrap; that attribute must be callable.
+        
+        Returns:
+            wrapper (callable): A function that calls the original method and then writes a single line to `log_file` containing the timestamp, the tool name, and the keyword-argument pairs from the recorded tool call.
+        """
         func = getattr(obj, func_name)
         @wraps(func)
         def wrapper(*args, **kwargs):
@@ -1632,6 +1943,14 @@ def run_analysis():
 
 
 def show_main_menu():
+    """
+    Display the main menu UI and prompt the user to choose an action.
+    
+    Reads and renders the welcome screen, then presents choices for analyzing a specific stock or discovering trending stocks. Exits the process if the user cancels or makes no selection.
+    
+    Returns:
+        choice (str): 'analyze' when the user selects "Analyze a specific stock", 'discover' when the user selects "Discover trending stocks".
+    """
     with open("./cli/static/welcome.txt", "r") as f:
         welcome_ascii = f.read()
 
@@ -1681,16 +2000,29 @@ def show_main_menu():
 
 @app.command()
 def analyze():
+    """
+    Launch the interactive stock analysis command that runs the full analysis workflow.
+    """
     run_analysis()
 
 
 @app.command()
 def discover():
+    """
+    Start the interactive trending-stocks discovery workflow.
+    
+    Prompts the user for lookback period, optional sector/event filters, and model/backend choices, runs the discovery process, displays progress and results, and saves discovery results when completed.
+    """
     discover_trending_flow()
 
 
 @app.command()
 def menu():
+    """
+    Present the main menu and route the user to the selected workflow.
+    
+    Displays the top-level menu, then starts the Analyze workflow when the user chooses "analyze" or the Discover trending-stocks workflow when the user chooses "discover".
+    """
     choice = show_main_menu()
     if choice == "analyze":
         run_analysis()

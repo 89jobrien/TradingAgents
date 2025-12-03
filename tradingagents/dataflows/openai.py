@@ -77,6 +77,16 @@ def get_global_news_openai(curr_date, look_back_days=7, limit=5):
 
 
 def get_fundamentals_openai(ticker, curr_date):
+    """
+    Request fundamental discussions and a table of financial metrics for a ticker covering the month before and the month of the given date.
+    
+    Parameters:
+        ticker (str): Stock ticker symbol to search for.
+        curr_date (str | datetime.date): Reference date; the function searches for content posted during the month before and the month of this date.
+    
+    Returns:
+        str: Plain text produced by the model containing a table of fundamentals (e.g., P/E, P/S, cash flow) and related discussion for the specified period.
+    """
     config = get_config()
     client = OpenAI(base_url=config["backend_url"])
 
@@ -112,6 +122,23 @@ def get_fundamentals_openai(ticker, curr_date):
 
 
 def get_bulk_news_openai(lookback_hours: int) -> List[Dict[str, Any]]:
+    """
+    Fetch recent market-related articles from an OpenAI-backed web search within a lookback window and return them as a normalized list.
+    
+    Parameters:
+        lookback_hours (int): Number of hours before the current time to include in the search window.
+    
+    Returns:
+        List[Dict[str, Any]]: A list of articles where each dict contains the keys:
+            - `title` (str): Article title.
+            - `source` (str): Source name (defaults to "Web Search" if not provided).
+            - `url` (str): Article URL.
+            - `published_at` (str): ISO-formatted publication datetime (defaults to current time if not provided).
+            - `content_snippet` (str): Short summary of the article, truncated to 500 characters.
+    
+    Notes:
+        If the OpenAI response cannot be parsed as JSON or expected fields are missing, an empty list is returned.
+    """
     config = get_config()
     client = OpenAI(base_url=config["backend_url"])
 

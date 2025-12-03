@@ -20,6 +20,15 @@ from tradingagents.agents.utils.news_data_tools import (
 )
 
 def create_msg_delete():
+    """
+    Clear all messages and replace them with removal operations followed by a 'Continue' placeholder for Anthropic compatibility.
+    
+    Parameters:
+        state (dict): Mapping that must include a "messages" iterable of message objects; each message object is expected to have an `id` attribute.
+    
+    Returns:
+        dict: A mapping with key "messages" whose value is a list of `RemoveMessage` instances (one per original message) followed by a single `HumanMessage` with content "Continue".
+    """
     def delete_messages(state):
         """Clear messages and add placeholder for Anthropic compatibility"""
         messages = state["messages"]

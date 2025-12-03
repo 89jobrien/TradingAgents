@@ -22,6 +22,19 @@ def create_mock_trending_stock(
     sector: Sector = Sector.TECHNOLOGY,
     event_type: EventCategory = EventCategory.EARNINGS,
 ) -> TrendingStock:
+    """
+    Create a mock TrendingStock populated with the provided identifiers and fixed test values for other fields.
+    
+    Parameters:
+        ticker (str): Stock ticker symbol, e.g. "AAPL".
+        company_name (str): Full company name.
+        score (float): Trending score for the stock.
+        sector (Sector): Sector classification for the stock.
+        event_type (EventCategory): Event category associated with the trending signal.
+    
+    Returns:
+        TrendingStock: A TrendingStock instance with the given fields and fixed mock values for mention_count, sentiment, news_summary, and source_articles.
+    """
     return TrendingStock(
         ticker=ticker,
         company_name=company_name,
@@ -36,6 +49,14 @@ def create_mock_trending_stock(
 
 
 def create_mock_news_article() -> NewsArticle:
+    """
+    Create a mock NewsArticle populated with fixed test values for use in tests.
+    
+    Returns:
+        NewsArticle: A NewsArticle with title "Test Article", source "Test Source",
+        url "https://example.com/article", published_at set to the current datetime,
+        content_snippet "Test content about Apple stock", and ticker_mentions ["AAPL"].
+    """
     return NewsArticle(
         title="Test Article",
         source="Test Source",
@@ -178,6 +199,16 @@ class TestTimeoutHandling:
     @patch("tradingagents.graph.trading_graph.get_bulk_news")
     def test_timeout_raises_discovery_timeout_error(self, mock_bulk_news):
         def slow_fetch(*args, **kwargs):
+            """
+            Simulates a slow fetch by sleeping for 0.5 seconds before producing a result.
+            
+            Parameters:
+                *args: Passed through but ignored.
+                **kwargs: Passed through but ignored.
+            
+            Returns:
+                An empty list.
+            """
             import time
             time.sleep(0.5)
             return []

@@ -263,6 +263,15 @@ class TestMinimumThresholdFiltering:
         ) as mock_resolve:
 
             def resolve_side_effect(name):
+                """
+                Map a company name string to a fixed ticker for use as a test side effect.
+                
+                Parameters:
+                    name (str): The input company name or identifier to inspect.
+                
+                Returns:
+                    str: `"AMD"` if `name` equals `"AMD"` or contains `"AMD"`, `"MSFT"` otherwise.
+                """
                 if "AMD" in name or name == "AMD":
                     return "AMD"
                 return "MSFT"
@@ -449,6 +458,15 @@ class TestSortingByScoreDescending:
         ) as mock_resolve:
 
             def resolve_side_effect(name):
+                """
+                Map a company display name to a recognized ticker symbol.
+                
+                Parameters:
+                    name (str): Company name or mention text to resolve.
+                
+                Returns:
+                    str or None: The ticker symbol for the recognized company (for example, "AAPL" or "TSLA"), or `None` if the name cannot be resolved.
+                """
                 if "Apple" in name:
                     return "AAPL"
                 if "Tesla" in name:

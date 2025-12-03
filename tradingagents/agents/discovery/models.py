@@ -40,6 +40,12 @@ class NewsArticle:
     ticker_mentions: List[str]
 
     def to_dict(self) -> Dict[str, Any]:
+        """
+        Convert the NewsArticle to a JSON-serializable dictionary.
+        
+        Returns:
+            dict: Mapping with keys "title", "source", "url", "published_at" (ISO 8601 string), "content_snippet", and "ticker_mentions".
+        """
         return {
             "title": self.title,
             "source": self.source,
@@ -51,6 +57,21 @@ class NewsArticle:
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "NewsArticle":
+        """
+        Constructs a NewsArticle from a dictionary containing serialized article fields.
+        
+        Parameters:
+            data (Dict[str, Any]): Mapping with keys:
+                - "title": article title string
+                - "source": source name string
+                - "url": article URL string
+                - "published_at": ISO-format datetime string
+                - "content_snippet": short content string
+                - "ticker_mentions": list of ticker symbol strings
+        
+        Returns:
+            news_article (NewsArticle): NewsArticle instance built from the provided data.
+        """
         return cls(
             title=data["title"],
             source=data["source"],
@@ -74,6 +95,12 @@ class TrendingStock:
     source_articles: List[NewsArticle]
 
     def to_dict(self) -> Dict[str, Any]:
+        """
+        Serialize the TrendingStock into a JSON-serializable dictionary.
+        
+        Returns:
+            dict: Dictionary with the trending stock's fields. Enum fields `sector` and `event_type` are converted to their string values, and `source_articles` is a list of each article serialized via its `to_dict()` method.
+        """
         return {
             "ticker": self.ticker,
             "company_name": self.company_name,
@@ -88,6 +115,17 @@ class TrendingStock:
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "TrendingStock":
+        """
+        Constructs a TrendingStock instance from its dictionary representation.
+        
+        Parameters:
+            data (Dict[str, Any]): Dictionary with keys "ticker", "company_name", "score", "mention_count",
+                "sentiment", "sector" (sector name string), "event_type" (event category name string),
+                "news_summary", and "source_articles" (list of article dicts compatible with NewsArticle.from_dict).
+        
+        Returns:
+            TrendingStock: A TrendingStock built from the provided dictionary.
+        """
         return cls(
             ticker=data["ticker"],
             company_name=data["company_name"],
@@ -112,6 +150,19 @@ class DiscoveryRequest:
     created_at: datetime = field(default_factory=datetime.now)
 
     def to_dict(self) -> Dict[str, Any]:
+        """
+        Serialize the DiscoveryRequest to a JSON-serializable dictionary.
+        
+        The returned dictionary contains:
+        - "lookback_period": the lookback period string.
+        - "sector_filter": a list of sector names as strings or `None` if no filter is set.
+        - "event_filter": a list of event category names as strings or `None` if no filter is set.
+        - "max_results": the maximum number of results.
+        - "created_at": the creation timestamp as an ISO 8601 string.
+        
+        Returns:
+            dict: A mapping suitable for JSON serialization representing this request.
+        """
         return {
             "lookback_period": self.lookback_period,
             "sector_filter": (
@@ -126,6 +177,20 @@ class DiscoveryRequest:
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "DiscoveryRequest":
+        """
+        Constructs a DiscoveryRequest from a mapping, converting string values to their corresponding enums and parsing timestamps.
+        
+        Parameters:
+            data (Dict[str, Any]): Dictionary with keys:
+                - "lookback_period" (str): Lookback period identifier.
+                - "sector_filter" (Optional[List[str]]): Optional list of sector names to convert to Sector enum values.
+                - "event_filter" (Optional[List[str]]): Optional list of event category names to convert to EventCategory enum values.
+                - "max_results" (Optional[int]): Maximum number of results; defaults to 20 if absent.
+                - "created_at" (str): ISO-format datetime string for the request creation time.
+        
+        Returns:
+            DiscoveryRequest: Instance populated from the provided mapping; `sector_filter` and `event_filter` are lists of enums or None, and `created_at` is parsed from the ISO-format string.
+        """
         return cls(
             lookback_period=data["lookback_period"],
             sector_filter=(
@@ -153,6 +218,20 @@ class DiscoveryResult:
     error_message: Optional[str] = None
 
     def to_dict(self) -> Dict[str, Any]:
+        """
+        Serialize the DiscoveryResult into a JSON-serializable dictionary.
+        
+        Produces a dictionary containing the serialized discovery request, list of serialized trending stocks, the status as a string, ISO-formatted start and (optional) completion timestamps, and any error message.
+        
+        Returns:
+            dict: Mapping with keys:
+                - "request": serialized DiscoveryRequest
+                - "trending_stocks": list of serialized TrendingStock objects
+                - "status": discovery status as a string
+                - "started_at": ISO 8601 string of the start time
+                - "completed_at": ISO 8601 string of the completion time or `None`
+                - "error_message": error message string or `None`
+        """
         return {
             "request": self.request.to_dict(),
             "trending_stocks": [stock.to_dict() for stock in self.trending_stocks],
@@ -164,6 +243,20 @@ class DiscoveryResult:
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "DiscoveryResult":
+        """
+        Create a DiscoveryResult from its dictionary representation.
+        
+        Expects a dict produced by DiscoveryResult.to_dict(), with keys:
+        `request` (dict), `trending_stocks` (list of dicts), `status` (str),
+        `started_at` (ISO datetime string), optional `completed_at` (ISO datetime string or None),
+        and optional `error_message` (str).
+        
+        Parameters:
+            data (Dict[str, Any]): Dictionary containing DiscoveryResult fields as produced by to_dict().
+        
+        Returns:
+            DiscoveryResult: An instance populated from the provided dictionary.
+        """
         return cls(
             request=DiscoveryRequest.from_dict(data["request"]),
             trending_stocks=[

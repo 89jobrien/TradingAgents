@@ -45,7 +45,19 @@ class FinancialSituationMemory:
         )
 
     def get_memories(self, current_situation, n_matches=1):
-        """Find matching recommendations using OpenAI embeddings"""
+        """
+        Retrieve past situations similar to the provided current situation and their associated recommendations.
+        
+        Parameters:
+            current_situation (str): The description of the current financial situation to match against stored situations.
+            n_matches (int): Maximum number of matching situations to return.
+        
+        Returns:
+            list[dict]: A list of matched results ordered by similarity (most similar first). Each dict contains:
+                - "matched_situation" (str): The stored situation text that matched the query.
+                - "recommendation" (str): The recommendation metadata associated with the matched situation.
+                - "similarity_score" (float): Similarity score between 0 and 1, where 1 indicates identical.
+        """
         query_embedding = self.get_embedding(current_situation)
 
         results = self.situation_collection.query(

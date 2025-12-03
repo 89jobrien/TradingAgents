@@ -36,6 +36,21 @@ class ExtractionResponse(BaseModel):
 
 
 def _get_llm(config: Optional[dict] = None):
+    """
+    Selects and returns a chat-model client instance according to the provided configuration.
+    
+    Parameters:
+        config (Optional[dict]): Optional configuration overrides. Recognized keys:
+            - "llm_provider" (str): provider name ("openai", "anthropic", "google", etc.).
+            - "quick_think_llm" (str): model identifier to use.
+            - "backend_url" (str): base URL for provider APIs (used for OpenAI/Anthropic-compatible providers).
+    
+    Returns:
+        A chat-model client instance (one of ChatOpenAI, ChatAnthropic, or ChatGoogleGenerativeAI) configured per `config`.
+    
+    Raises:
+        ValueError: If `llm_provider` specifies an unsupported provider.
+    """
     cfg = config or DEFAULT_CONFIG
     provider = cfg.get("llm_provider", "openai").lower()
     model = cfg.get("quick_think_llm", "gpt-4o-mini")
@@ -86,6 +101,18 @@ Extract all company mentions from the articles above."""
 
 
 def _format_articles_for_prompt(articles: List[NewsArticle], start_idx: int) -> str:
+    """
+    Format a list of NewsArticle objects into a prompt-ready string with indexed article blocks.
+    
+    Each block includes an article ID (computed as "article_{start_idx + position}"), Title, Source, and Content. Blocks are joined with a line separator ("---").
+    
+    Parameters:
+        articles (List[NewsArticle]): Articles to format for the LLM prompt.
+        start_idx (int): Base index used when generating article IDs.
+    
+    Returns:
+        str: A single string containing the formatted article blocks ready for insertion into the extraction prompt.
+    """
     formatted = []
     for i, article in enumerate(articles):
         article_id = f"article_{start_idx + i}"
@@ -103,6 +130,16 @@ def _extract_batch(
     start_idx: int,
     llm,
 ) -> List[EntityMention]:
+    """
+    Extract entity mentions from a batch of articles using the provided LLM and normalize the results.
+    
+    Parameters:
+        articles (List[NewsArticle]): The articles to process for entity extraction.
+        start_idx (int): Base index used to generate article IDs (each mention will have article_id set to "article_{start_idx}").
+    
+    Returns:
+        List[EntityMention]: A list of extracted and normalized entity mentions. Event types are validated against EventCategory (invalid types become "other"), confidence is clamped to [0.0, 1.0], sentiment is clamped to [-1.0, 1.0], and context snippets are truncated to 150 characters when necessary.
+    """
     if not articles:
         return []
 
@@ -143,6 +180,18 @@ def extract_entities(
     articles: List[NewsArticle],
     config: Optional[dict] = None,
 ) -> List[EntityMention]:
+    """
+    Extracts company mentions and associated metadata from the provided news articles.
+    
+    Processes the input articles in batches (size defined by BATCH_SIZE) using a configurable LLM backend to identify publicly traded company mentions, event types, confidence, context snippets, and sentiment. Results include an article_id derived from each article's zero-based position (formatted as "article_{index}").
+    
+    Parameters:
+        articles (List[NewsArticle]): Articles to analyze for company mentions.
+        config (Optional[dict]): Optional configuration mapping used to select/configure the LLM backend.
+    
+    Returns:
+        List[EntityMention]: A flat list of extracted entity mentions for all articles.
+    """
     if not articles:
         return []
 

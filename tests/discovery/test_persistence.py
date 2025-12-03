@@ -22,6 +22,13 @@ from tradingagents.agents.discovery.persistence import (
 
 @pytest.fixture
 def sample_discovery_result():
+    """
+    Create a sample DiscoveryResult populated with example news articles and trending stocks for use in tests.
+    
+    The result includes a DiscoveryRequest with a 24h lookback and filters for the Technology sector and Earnings events, three TrendingStock entries (AAPL, MSFT, GOOGL) with associated news summaries and source articles, a completed status, and started/completed timestamps.
+    Returns:
+        DiscoveryResult: A populated DiscoveryResult instance suitable for fixture use in tests.
+    """
     articles = [
         NewsArticle(
             title="Apple announces new iPhone with AI features",
@@ -104,6 +111,12 @@ def sample_discovery_result():
 
 @pytest.fixture
 def temp_results_dir():
+    """
+    Create a temporary directory for test results and yield its Path; the directory is removed after the consumer finishes.
+    
+    Returns:
+        Path: Path object pointing to the temporary directory provided for the test.
+    """
     temp_dir = tempfile.mkdtemp()
     yield Path(temp_dir)
     shutil.rmtree(temp_dir)

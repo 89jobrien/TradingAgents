@@ -124,6 +124,18 @@ _bulk_news_cache: Dict[str, Dict[str, Any]] = {}
 
 
 def parse_lookback_period(lookback: str) -> int:
+    """
+    Convert a lookback period string into its equivalent number of hours.
+    
+    Parameters:
+        lookback (str): Lookback period string; accepted values are "1h", "6h", "24h", and "7d".
+    
+    Returns:
+        int: Number of hours represented by `lookback` (1, 6, 24, or 168).
+    
+    Raises:
+        ValueError: If `lookback` is not one of the accepted values.
+    """
     lookback = lookback.lower().strip()
 
     if lookback == "1h":
@@ -139,6 +151,15 @@ def parse_lookback_period(lookback: str) -> int:
 
 
 def _get_cached_bulk_news(lookback_period: str) -> Optional[List[NewsArticle]]:
+    """
+    Retrieve cached bulk news articles for the given lookback period if a fresh cache entry exists.
+    
+    Parameters:
+        lookback_period (str): Cache key representing the requested lookback period (e.g., "1h", "24h", "7d").
+    
+    Returns:
+        Optional[List[NewsArticle]]: A list of cached NewsArticle objects if an unexpired cache entry is present, `None` otherwise.
+    """
     cache_key = lookback_period
     if cache_key in _bulk_news_cache:
         cached = _bulk_news_cache[cache_key]
@@ -149,6 +170,13 @@ def _get_cached_bulk_news(lookback_period: str) -> Optional[List[NewsArticle]]:
 
 
 def _set_cached_bulk_news(lookback_period: str, articles: List[NewsArticle]) -> None:
+    """
+    Store a list of NewsArticle objects in the in-memory bulk-news cache under the given lookback period.
+    
+    Parameters:
+        lookback_period (str): Lookup key representing the lookback window (e.g., "1h", "24h", "7d").
+        articles (List[NewsArticle]): Articles to cache; stored alongside the current timestamp.
+    """
     cache_key = lookback_period
     _bulk_news_cache[cache_key] = {
         "timestamp": datetime.now(),
@@ -157,6 +185,17 @@ def _set_cached_bulk_news(lookback_period: str, articles: List[NewsArticle]) -> 
 
 
 def _convert_to_news_articles(raw_articles: List[Dict[str, Any]]) -> List[NewsArticle]:
+    """
+    Convert a list of raw article dictionaries into a list of NewsArticle instances.
+    
+    Parses each input dict and maps keys to NewsArticle fields. The function accepts a string or datetime for `published_at`; ISO-formatted strings ending with "Z" are supported and fall back to the current time when parsing fails or when the field is missing or of an unexpected type. Items that raise exceptions during conversion are skipped.
+    
+    Parameters:
+        raw_articles (List[Dict[str, Any]]): Iterable of article-like dictionaries. Expected keys (optional): `title`, `source`, `url`, `published_at`, `content_snippet`.
+    
+    Returns:
+        List[NewsArticle]: Converted list of NewsArticle objects. Each article's `ticker_mentions` is initialized as an empty list.
+    """
     articles = []
     for item in raw_articles:
         try:
@@ -186,6 +225,18 @@ def _convert_to_news_articles(raw_articles: List[Dict[str, Any]]) -> List[NewsAr
 
 
 def _fetch_bulk_news_from_vendor(lookback_period: str) -> List[Dict[str, Any]]:
+    """
+    Fetch raw bulk news articles from available vendors using a prioritized vendor order and return the first non-empty result.
+    
+    Parameters:
+        lookback_period (str): Lookback interval for news (accepted values: "1h", "6h", "24h", "7d").
+    
+    Returns:
+        List[Dict[str, Any]]: Raw article dictionaries returned by the first vendor that produces results, or an empty list if no vendor returns articles.
+    
+    Raises:
+        ValueError: If `lookback_period` is not one of the accepted formats.
+    """
     lookback_hours = parse_lookback_period(lookback_period)
 
     vendor_order = ["alpha_vantage", "openai", "google"]
@@ -214,6 +265,15 @@ def _fetch_bulk_news_from_vendor(lookback_period: str) -> List[Dict[str, Any]]:
 
 
 def get_bulk_news(lookback_period: str = "24h") -> List[NewsArticle]:
+    """
+    Fetches recent news articles for the given lookback period, using a cached result when available and updating the cache after fetching.
+    
+    Parameters:
+        lookback_period (str): Lookback window for articles. Accepted values: "1h", "6h", "24h", "7d".
+    
+    Returns:
+        List[NewsArticle]: A list of normalized NewsArticle objects for the requested lookback period.
+    """
     cached = _get_cached_bulk_news(lookback_period)
     if cached is not None:
         print(f"DEBUG: Returning cached bulk news for period '{lookback_period}'")
@@ -229,12 +289,34 @@ def get_bulk_news(lookback_period: str = "24h") -> List[NewsArticle]:
 
 
 def get_category_for_method(method: str) -> str:
+    """
+    Determine which tool category contains the given method name.
+    
+    Parameters:
+        method (str): The tool/method name to look up in TOOLS_CATEGORIES.
+    
+    Returns:
+        category (str): The name of the category that contains the method.
+    
+    Raises:
+        ValueError: If no category contains the provided method name.
+    """
     for category, info in TOOLS_CATEGORIES.items():
         if method in info["tools"]:
             return category
     raise ValueError(f"Method '{method}' not found in any category")
 
 def get_vendor(category: str, method: str = None) -> str:
+    """
+    Selects the configured vendor for a data category, optionally overridden by a per-method setting.
+    
+    Parameters:
+        category (str): The data category key used to look up the default vendor in configuration.
+        method (str, optional): An optional method name; if present and configured under `tool_vendors`, its vendor will be returned.
+    
+    Returns:
+        str: The vendor name configured for the given method if specified, otherwise the default vendor for the category from configuration, or `"default"` if no configuration is found.
+    """
     config = get_config()
 
     if method:
@@ -245,6 +327,19 @@ def get_vendor(category: str, method: str = None) -> str:
     return config.get("data_vendors", {}).get(category, "default")
 
 def route_to_vendor(method: str, *args, **kwargs):
+    """
+    Route a named data method to configured vendors, trying primary vendors then fallbacks until one or more implementations succeed.
+    
+    Parameters:
+        method (str): The name of the data retrieval method to route (must exist in the vendor method registry).
+    
+    Returns:
+        The single result returned by a vendor if exactly one result is produced; otherwise a newline-separated string with each result's string representation.
+    
+    Raises:
+        ValueError: If the provided method is not supported.
+        RuntimeError: If all vendor implementations fail to produce any results.
+    """
     category = get_category_for_method(method)
     vendor_config = get_vendor(category, method)
 

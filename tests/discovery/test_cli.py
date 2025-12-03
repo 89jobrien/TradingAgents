@@ -16,6 +16,15 @@ from tradingagents.agents.discovery.models import (
 
 @pytest.fixture
 def sample_trending_stocks():
+    """
+    Create a list of sample TrendingStock instances used by tests.
+    
+    Each TrendingStock is populated with realistic test data (ticker, company_name, score, mention_count,
+    sentiment, sector, event_type, news_summary) and references a shared NewsArticle in `source_articles`.
+    
+    Returns:
+        list[TrendingStock]: Three sample TrendingStock objects for AAPL, MSFT, and NVDA.
+    """
     article = NewsArticle(
         title="Apple announces new iPhone",
         source="Reuters",
@@ -63,6 +72,15 @@ def sample_trending_stocks():
 
 @pytest.fixture
 def sample_discovery_result(sample_trending_stocks):
+    """
+    Builds a completed DiscoveryResult populated with the given trending stocks and a preset 24h request.
+    
+    Parameters:
+        sample_trending_stocks (list[TrendingStock]): TrendingStock instances to include in the result.
+    
+    Returns:
+        DiscoveryResult: A DiscoveryResult with a DiscoveryRequest (lookback_period="24h", max_results=20), status set to `DiscoveryStatus.COMPLETED`, `trending_stocks` set to the provided list, and `started_at`/`completed_at` set to the current time.
+    """
     request = DiscoveryRequest(
         lookback_period="24h",
         max_results=20,

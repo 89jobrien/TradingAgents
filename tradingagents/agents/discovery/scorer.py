@@ -20,6 +20,17 @@ DEFAULT_MIN_MENTIONS = 2
 
 
 def _aggregate_sentiment(mentions: List[EntityMention]) -> float:
+    """
+    Compute the weighted average sentiment from a list of entity mentions.
+    
+    Returns 0.0 if the input list is empty or if the sum of mention confidences is zero.
+    
+    Parameters:
+        mentions (List[EntityMention]): Mentions whose sentiment values and confidences are used to compute the weighted average.
+    
+    Returns:
+        float: Weighted average sentiment (sum(sentiment * confidence) / sum(confidence)), or 0.0 when not computable.
+    """
     if not mentions:
         return 0.0
 
@@ -41,6 +52,17 @@ def _calculate_recency_weight(
     article_ids: set,
     decay_rate: float,
 ) -> float:
+    """
+    Compute an average recency weight for a set of articles based on an exponential decay of hours since publication.
+    
+    Parameters:
+        articles (List[NewsArticle]): List of articles whose publication timestamps (`published_at`) are used to compute recency weights.
+        article_ids (set): Set of identifiers in the form "article_<index>" corresponding to items in `articles`; only matching articles contribute to the result.
+        decay_rate (float): Exponential decay rate applied per hour; larger values reduce weight for older articles more rapidly.
+    
+    Returns:
+        float: Average recency weight in the range (0, 1], where 1.0 is returned if `articles` is empty or no articles match `article_ids`.
+    """
     if not articles:
         return 1.0
 
@@ -61,6 +83,15 @@ def _calculate_recency_weight(
 
 
 def _get_most_common_event_type(mentions: List[EntityMention]) -> EventCategory:
+    """
+    Selects the most frequent event category from a list of entity mentions.
+    
+    Parameters:
+        mentions (List[EntityMention]): Mentions whose `event_type` values will be counted.
+    
+    Returns:
+        EventCategory: The event category that appears most often among `mentions`. Returns `EventCategory.OTHER` if `mentions` is empty.
+    """
     if not mentions:
         return EventCategory.OTHER
 
@@ -72,6 +103,15 @@ def _get_most_common_event_type(mentions: List[EntityMention]) -> EventCategory:
 
 
 def _build_news_summary(mentions: List[EntityMention]) -> str:
+    """
+    Create a concise news summary by concatenating the context snippets from up to the first three mentions.
+    
+    Parameters:
+        mentions (List[EntityMention]): Ordered mentions to extract context snippets from.
+    
+    Returns:
+        summary (str): Concatenated context snippets separated by spaces, or an empty string if `mentions` is empty.
+    """
     if not mentions:
         return ""
 
@@ -86,6 +126,19 @@ def calculate_trending_scores(
     max_results: int = DEFAULT_MAX_RESULTS,
     min_mentions: int = DEFAULT_MIN_MENTIONS,
 ) -> List[TrendingStock]:
+    """
+    Compute trending stocks from entity mentions and associated news articles.
+    
+    Parameters:
+        mentions (List[EntityMention]): Entity mentions linking companies to articles; used to group by ticker and aggregate metrics.
+        articles (List[NewsArticle]): Source articles referenced by mention.article_id; used to compute recency weights and populate source_articles.
+        decay_rate (float): Exponential decay rate applied to article age when computing recency weight; higher values reduce weight for older articles.
+        max_results (int): Maximum number of TrendingStock entries to return after sorting by score.
+        min_mentions (int): Minimum number of distinct article mentions required for a ticker to be considered trending.
+    
+    Returns:
+        trending_stocks (List[TrendingStock]): Sorted list of TrendingStock objects (highest score first), truncated to at most `max_results`. Each entry includes ticker, company_name, composite score, mention_count, aggregated sentiment, sector (falls back to `Sector.OTHER` on invalid classification), predominant event_type, a short news_summary, and the list of source_articles.
+    """
     if not mentions:
         return []
 
